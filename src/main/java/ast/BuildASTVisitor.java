@@ -661,6 +661,36 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     }
 
     @Override
+    public ASTNode visitGoToStmt(BabyCobolParser.GoToStmtContext ctx) {
+        return new ASTNode("GoToStmt", ctx.ID().getText());
+    }
+
+    @Override
+    public ASTNode visitAlterStmt(BabyCobolParser.AlterStmtContext ctx) {
+        ASTNode node = new ASTNode("AlterStmt");
+        // ALTER <source> TO PROCEED TO <target>
+        node.addChild(new ASTNode("ID", ctx.ID(0).getText()));
+        node.addChild(new ASTNode("ID", ctx.ID(1).getText()));
+        return node;
+    }
+
+    @Override
+    public ASTNode visitSignalStmt(BabyCobolParser.SignalStmtContext ctx) {
+        ASTNode node = new ASTNode("SignalStmt");
+        if (ctx.OFF() != null) {
+            node.addChild(new ASTNode("Off"));
+        } else {
+            node.addChild(new ASTNode("ID", ctx.ID().getText()));
+        }
+        return node;
+    }
+
+    @Override
+    public ASTNode visitCallStmt(BabyCobolParser.CallStmtContext ctx) {
+        return new ASTNode("CallStmt", ctx.ID().getText());
+    }
+
+    @Override
     public ASTNode visitSubtractStmt(BabyCobolParser.SubtractStmtContext ctx) {
         ASTNode node = new ASTNode("SubtractStmt");
         for (BabyCobolParser.AtomicContext atomic : ctx.atomic()) {
