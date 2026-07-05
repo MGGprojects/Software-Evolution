@@ -16,6 +16,9 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     // of the top of the stack. when the level equals or is lower, we pop.
     private Stack<Symbol> recordStack = new Stack<>();
 
+    // paragraph names for PERFORM validation (collected before visiting sentences)
+    private Set<String> paragraphNames;
+
     public SymbolTable getSymbolTable() {
         return symbolTable;
     }
@@ -264,6 +267,12 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
 
     @Override
     public ASTNode visitProcedure(BabyCobolParser.ProcedureContext ctx) {
+        // pre scan, so collect all paragraph names for PERFORM validation
+        this.paragraphNames = new HashSet<>();
+        for (BabyCobolParser.ParagraphContext paragraph : ctx.paragraph()) {
+            this.paragraphNames.add(paragraph.ID().getText().toLowerCase());
+        }
+
         ASTNode node = new ASTNode("Procedure");
         for (BabyCobolParser.SentenceContext sentence : ctx.sentence()) {
             node.addChild(visit(sentence));
@@ -428,6 +437,13 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
 
     @Override
     public ASTNode visitPerformStmt(BabyCobolParser.PerformStmtContext ctx) {
+        String targetName = ctx.ID().getText().toLowerCase();
+
+        if (paragraphNames != null && !paragraphNames.contains(targetName)) {
+            throw new IllegalArgumentException(
+                "PERFORM target paragraph '" + ctx.ID().getText() + "' does not exist.");
+        }
+
         ASTNode node = new ASTNode("PerformStmt");
         node.addChild(new ASTNode("ID", ctx.ID().getText()));
         if (ctx.throughClause() != null) {
@@ -441,6 +457,13 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
 
     @Override
     public ASTNode visitThroughClause(BabyCobolParser.ThroughClauseContext ctx) {
+        String throughName = ctx.ID().getText().toLowerCase();
+
+        if (paragraphNames != null && !paragraphNames.contains(throughName)) {
+            throw new IllegalArgumentException(
+                "PERFORM THROUGH paragraph '" + ctx.ID().getText() + "' does not exist.");
+        }
+
         return new ASTNode("ThroughClause", ctx.ID().getText());
     }
 
@@ -635,6 +658,36 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitNextSentenceStmt(BabyCobolParser.NextSentenceStmtContext ctx) {
         return new ASTNode("NextSentenceStmt");
+    }
+
+    @Override
+    public ASTNode visitGoToStmt(BabyCobolParser.GoToStmtContext ctx) {
+        return new ASTNode("GoToStmt", ctx.ID().getText());
+    }
+
+    @Override
+    public ASTNode visitAlterStmt(BabyCobolParser.AlterStmtContext ctx) {
+        ASTNode node = new ASTNode("AlterStmt");
+        // ALTER <source> TO PROCEED TO <target>
+        node.addChild(new ASTNode("ID", ctx.ID(0).getText()));
+        node.addChild(new ASTNode("ID", ctx.ID(1).getText()));
+        return node;
+    }
+
+    @Override
+    public ASTNode visitSignalStmt(BabyCobolParser.SignalStmtContext ctx) {
+        ASTNode node = new ASTNode("SignalStmt");
+        if (ctx.OFF() != null) {
+            node.addChild(new ASTNode("Off"));
+        } else {
+            node.addChild(new ASTNode("ID", ctx.ID().getText()));
+        }
+        return node;
+    }
+
+    @Override
+    public ASTNode visitCallStmt(BabyCobolParser.CallStmtContext ctx) {
+        return new ASTNode("CallStmt", ctx.ID().getText());
     }
 
     @Override

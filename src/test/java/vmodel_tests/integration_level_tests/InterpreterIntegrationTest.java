@@ -178,4 +178,131 @@ public class InterpreterIntegrationTest {
         assertEquals(6.0, (Double) memory.get("cnt1"));
         assertEquals(3.0, (Double) memory.get("cnt2"));
     }
+
+    @Test
+    public void testPerformThroughMissingTarget() {
+        String filename = "perform_target_missing.babycob";
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            runProgram(filename);
+        });
+        assertTrue(exception.getMessage().contains("doesnotexist")
+                || exception.getMessage().contains("DOESNOTEXIST"),
+            "Error should mention the missing paragraph name");
+    }
+
+    @Test
+    public void testPerformThroughMissingThrough() {
+        String filename = "perform_through_missing.babycob";
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            runProgram(filename);
+        });
+        assertTrue(exception.getMessage().contains("nonexistent")
+                || exception.getMessage().contains("NONEXISTENT"),
+            "Error should mention the missing THROUGH paragraph name");
+    }
+
+    @Test
+    public void testPerformArithmeticMultipleTimes() throws Exception {
+        Map<String, Object> memory = runProgram("perform_arithmetic_times.babycob").getMemory();
+        // COUNTER: PERFORM ADDONE 5 TIMES => 5, PERFORM ADDONE THROUGH ADDTHREE 3 TIMES => +3 = 8
+        //   then fallthrough executes ADDONE => +1 = 9
+        // TOTAL: PERFORM ADDONE THROUGH ADDTHREE 3 TIMES => ADDTHREE 3*3 = 9
+        //   then fallthrough executes ADDTHREE => +3 = 12
+        assertEquals(9.0, (Double) memory.get("counter"), 0.001,
+            "COUNTER should be 9: 5 from first PERFORM + 3 from second PERFORM + 1 from fallthrough");
+        assertEquals(12.0, (Double) memory.get("total"), 0.001,
+            "TOTAL should be 12: 9 from PERFORM THROUGH + 3 from fallthrough");
+    }
+
+    // --- Computable GO TO tests ---
+
+    @Test
+    public void testGoToComputable() throws Exception {
+        runProgram("goto_computable.babycob");
+        String stdout = outContent.toString();
+        assertTrue(stdout.contains("START"), "Should print START before GO TO");
+        assertTrue(stdout.contains("END"), "Should print END after computed GO TO to FINISH");
+        assertFalse(stdout.contains("SHOULD NOT PRINT"), "Should skip the DISPLAY after GO TO");
+    }
+
+    @Test
+    public void testGoToComputableInvalidTarget() {
+        String filename = "goto_computable_error.babycob";
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            runProgram(filename);
+        });
+        assertTrue(exception.getMessage().contains("DOES-NOT-EXIST")
+                || exception.getMessage().contains("DOES-NOT-EXIST".toLowerCase())
+                || exception.getMessage().contains("does not exist"),
+            "Error should mention the invalid runtime target");
+    }
+
+    @Test
+    public void testGoToBasic() throws Exception {
+        runProgram("goto_basic.babycob");
+        String stdout = outContent.toString();
+        assertTrue(stdout.contains("START"), "Should print START");
+        assertTrue(stdout.contains("END"), "Should print END after GO TO FINISH");
+        assertFalse(stdout.contains("SHOULD NOT PRINT"), "Should skip the DISPLAY after GO TO");
+    }
+
+    // --- ALTER tests ---
+
+    @Test
+    public void testAlterBasic() throws Exception {
+        runProgram("alter_basic.babycob");
+        String stdout = outContent.toString();
+        assertTrue(stdout.contains("START"), "Should print START");
+        assertTrue(stdout.contains("THIRD"), "ALTER should redirect GO TO FIRST to GO TO THIRD");
+        assertTrue(stdout.contains("END"), "Should print END");
+        assertFalse(stdout.contains("SECOND"), "SECOND should not be printed because ALTER redirected FIRST to THIRD");
+    }
+
+    @Test
+    public void testAlterUnknownSource() {
+        String filename = "alter_unknown_source.babycob";
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            runProgram(filename);
+        });
+        assertTrue(exception.getMessage().contains("Unknown paragraph")
+                || exception.getMessage().contains("DOESNOTEXIST"),
+            "Error should mention the unknown source paragraph");
+    }
+
+    @Test
+    public void testAlterUnknownTarget() {
+        String filename = "alter_unknown_target.babycob";
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            runProgram(filename);
+        });
+        assertTrue(exception.getMessage().contains("Unknown ALTER target")
+                || exception.getMessage().contains("DOESNOTEXIST"),
+            "Error should mention the unknown target paragraph");
+    }
+
+    // --- SIGNAL tests ---
+
+    @Test
+    public void testSignalBasic() throws Exception {
+        runProgram("signal_basic.babycob");
+        String stdout = outContent.toString();
+        assertTrue(stdout.contains("START"), "Should print START");
+        assertTrue(stdout.contains("ERROR CAUGHT"), "SIGNAL handler should catch the error");
+        assertTrue(stdout.contains("END"), "Should print END after error handler");
+        assertFalse(stdout.contains("SHOULD NOT PRINT"), "Should skip the DISPLAY after the GO TO error");
+    }
+
+    @Test
+    public void testSignalOff() {
+        String filename = "signal_off.babycob";
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            runProgram(filename);
+        });
+        // after SIGNAL OFF the error from GO TO UNKNOWN should propagate as RuntimeException
+        String stdout = outContent.toString();
+        assertTrue(stdout.contains("SIGNAL ON"), "Should print SIGNAL ON");
+        assertTrue(stdout.contains("SIGNAL OFF"), "Should print SIGNAL OFF");
+        assertFalse(stdout.contains("ERROR CAUGHT"), "SIGNAL handler should NOT be triggered after SIGNAL OFF");
+        assertTrue(exception.getMessage() != null, "RuntimeException should be thrown after SIGNAL OFF disables the handler");
+    }
 }
