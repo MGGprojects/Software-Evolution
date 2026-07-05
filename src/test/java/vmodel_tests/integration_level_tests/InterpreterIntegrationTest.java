@@ -178,4 +178,39 @@ public class InterpreterIntegrationTest {
         assertEquals(6.0, (Double) memory.get("cnt1"));
         assertEquals(3.0, (Double) memory.get("cnt2"));
     }
+
+    @Test
+    public void testPerformThroughMissingTarget() {
+        String filename = "perform_target_missing.babycob";
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            runProgram(filename);
+        });
+        assertTrue(exception.getMessage().contains("doesnotexist")
+                || exception.getMessage().contains("DOESNOTEXIST"),
+            "Error should mention the missing paragraph name");
+    }
+
+    @Test
+    public void testPerformThroughMissingThrough() {
+        String filename = "perform_through_missing.babycob";
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            runProgram(filename);
+        });
+        assertTrue(exception.getMessage().contains("nonexistent")
+                || exception.getMessage().contains("NONEXISTENT"),
+            "Error should mention the missing THROUGH paragraph name");
+    }
+
+    @Test
+    public void testPerformArithmeticMultipleTimes() throws Exception {
+        Map<String, Object> memory = runProgram("perform_arithmetic_times.babycob").getMemory();
+        // COUNTER: PERFORM ADDONE 5 TIMES => 5, PERFORM ADDONE THROUGH ADDTHREE 3 TIMES => +3 = 8
+        //   then fallthrough executes ADDONE => +1 = 9
+        // TOTAL: PERFORM ADDONE THROUGH ADDTHREE 3 TIMES => ADDTHREE 3*3 = 9
+        //   then fallthrough executes ADDTHREE => +3 = 12
+        assertEquals(9.0, (Double) memory.get("counter"), 0.001,
+            "COUNTER should be 9: 5 from first PERFORM + 3 from second PERFORM + 1 from fallthrough");
+        assertEquals(12.0, (Double) memory.get("total"), 0.001,
+            "TOTAL should be 12: 9 from PERFORM THROUGH + 3 from fallthrough");
+    }
 }
